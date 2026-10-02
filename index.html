@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7. The Persecution</title>
+<style>
+  :root {
+    --gold: #f3c96b;
+    --gold-dark: #9c7131;
+    --ink: #10131b;
+    --panel: rgba(15, 18, 27, .94);
+    --muted: #aeb4c2;
+    --red: #e65c61;
+    --green: #64d39a;
+    --blue: #73b8ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #090b10;
+    color: #f4f0e5;
+    font: 15px/1.45 Georgia, "Times New Roman", serif;
+    overflow: hidden;
+  }
+  button { font: inherit; }
+  #game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    min-height: 520px;
+    overflow: hidden;
+    background: #151922;
+  }
+  canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .topbar {
+    position: absolute;
+    z-index: 2;
+    top: 14px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    pointer-events: none;
+  }
+  .brand, .objective, .hud-card, .panel, .toast, .dialogue, .combat-box {
+    border: 1px solid rgba(243,201,107,.38);
+    background: var(--panel);
+    box-shadow: 0 8px 28px #0008;
+    backdrop-filter: blur(7px);
+  }
+  .brand { padding: 10px 14px; border-radius: 8px; }
+  .brand strong {
+    display: block; color: var(--gold); letter-spacing: .12em;
+    font-size: 14px; text-transform: uppercase;
+  }
+  .brand small { color: var(--muted); }
+  .objective {
+    padding: 9px 13px; border-radius: 8px; max-width: 310px;
+    color: #e8dfc8; font-size: 13px;
+  }
+  .objective b { color: var(--gold); }
+  .left-hud {
+    position: absolute; z-index: 2; left: 16px; bottom: 17px;
+    width: 235px; display: grid; gap: 8px;
+  }
+  .hud-card { padding: 9px 11px; border-radius: 8px; }
+  .hud-title {
+    display: flex; justify-content: space-between; color: #e8dfc8;
+    font-size: 12px; margin-bottom: 5px;
+  }
+  .bar { height: 9px; background: #34333a; border-radius: 8px; overflow: hidden; }
+  .fill { height: 100%; width: 100%; transition: width .2s; border-radius: 8px; }
+  #healthFill { background: linear-gradient(90deg,#a82f3e,#f06b68); }
+  #xpFill { background: linear-gradient(90deg,#5578d9,#8db8ff); }
+  .mini {
+    position: absolute; z-index: 2; right: 16px; bottom: 17px;
+    width: 150px; height: 150px; border-radius: 50%;
+    overflow: hidden; border: 2px solid var(--gold-dark);
+    background: #111722cc; box-shadow: 0 6px 25px #0009;
+  }
+  #mapCanvas { width: 100%; height: 100%; }
+  .controls {
+    position: absolute; z-index: 2; bottom: 17px; left: 270px;
+    color: #e8e1d0; font: 12px/1.8 Arial, sans-serif;
+    background: #10131bd9; border: 1px solid #ffffff24;
+    padding: 8px 12px; border-radius: 8px;
+  }
+  kbd {
+    display: inline-block; min-width: 22px; text-align: center;
+    padding: 1px 5px; border: 1px solid #aaa6; border-radius: 4px;
+    background: #ffffff12; color: var(--gold);
+  }
+  .panel {
+    position: absolute; z-index: 5; top: 50%; left: 50%;
+    transform: translate(-50%,-50%); width: min(540px, calc(100vw - 28px));
+    max-height: 82vh; overflow: auto; border-radius: 12px; padding: 20px;
+  }
+  .panel h2 { color: var(--gold); margin: 0 0 6px; }
+  .panel p { color: #ddd7c9; }
+  .panel .sub { color: var(--muted); font-size: 13px; margin-top: 0; }
+  .hidden { display: none !important; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 10px 0; border-top: 1px solid #ffffff19;
+  }
+  .row small { display: block; color: var(--muted); }
+  .btn {
+    border: 1px solid var(--gold-dark); color: #f8e9bd;
+    background: #44351f; border-radius: 6px; padding: 8px 12px;
+    cursor: pointer; transition: .15s;
+  }
+  .btn:hover { background: #644b27; }
+  .btn.primary { background: #8a642a; color: #fff5d5; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .close { float: right; }
+  .toast {
+    position: absolute; z-index: 8; top: 78px; left: 50%;
+    transform: translateX(-50%); padding: 9px 16px; border-radius: 8px;
+    color: #fff0c6; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .dialogue {
+    position: absolute; z-index: 4; bottom: 24px; left: 50%;
+    transform: translateX(-50%); width: min(630px, calc(100vw - 28px));
+    padding: 15px 18px; border-radius: 10px;
+  }
+  .dialogue b { color: var(--gold); }
+  .dialogue p { margin: 6px 0 12px; }
+  .dialogue-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .combat-box {
+    position: absolute; z-index: 4; top: 50%; left: 50%;
+    transform: translate(-50%,-50%); width: min(490px, calc(100vw - 28px));
+    padding: 18px; border-radius: 12px;
+  }
+  .combat-box h2 { margin: 0 0 5px; color: var(--red); }
+  .combat-box p { color: #ddd7c9; }
+  .combat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .combat-actions .btn { flex: 1; min-width: 105px; }
+  .enemy-bar { background: #352329; height: 10px; border-radius: 8px; overflow: hidden; }
+  #enemyFill { height: 100%; background: linear-gradient(90deg,#a72e3b,#f66a6a); }
+  .start-screen {
+    position: absolute; z-index: 10; inset: 0; display: grid; place-items: center;
+    background: linear-gradient(#080a10a8,#080a10e8), radial-gradient(ellipse at center,#34404b,#090b10);
+  }
+  .start-card {
+    width: min(650px, calc(100vw - 30px)); padding: 30px;
+    text-align: center; border: 1px solid #d4ac5d88; border-radius: 14px;
+    background: #10131beF; box-shadow: 0 20px 80px #000b;
+  }
+  .start-card .number { color: var(--gold); letter-spacing: .3em; font: 12px Arial,sans-serif; }
+  .start-card h1 { font-size: clamp(32px,7vw,58px); margin: 8px 0; color: #f3d78f; }
+  .start-card .byline { color: #b7ad99; font-style: italic; }
+  .start-card p { color: #ddd7c9; }
+  .story {
+    text-align: left; padding: 13px 15px; margin: 16px 0;
+    border-left: 2px solid var(--gold-dark); color: #c9c5bb;
+    font-size: 13px; line-height: 1.6;
+  }
+  .moral { color: #f1d58e !important; }
+  .quest-done { color: var(--green) !important; }
+  .skill-note { color: var(--blue); }
+  @media (max-width: 650px) {
+    .objective { display: none; }
+    .controls { left: 16px; bottom: 190px; }
+    .mini { width: 112px; height: 112px; }
+    .left-hud { width: 190px; }
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="world"></canvas>
+
+  <div class="topbar">
+    <div class="brand">
+      <strong>7. The Persecution</strong>
+      <small>By Harassechon Fudjiwik · Vidotsche</small>
+    </div>
+    <div class="objective"><b>Current objective:</b> <span id="objectiveText">Speak with Persecuria</span></div>
+  </div>
+
+  <div class="left-hud">
+    <div class="hud-card">
+      <div class="hud-title"><span id="playerName">Hesitoch Warrior</span><span id="levelText">Level 1</span></div>
+      <div class="bar"><div class="fill" id="healthFill"></div></div>
+      <div class="hud-title" style="margin:5px 0 0"><span>Health</span><span id="healthText">100 / 100</span></div>
+    </div>
+    <div class="hud-card">
+      <div class="hud-title"><span>Experience</span><span id="xpText">0 / 100 XP</span></div>
+      <div class="bar"><div class="fill" id="xpFill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move · <kbd>E</kbd> Interact<br>
+    <kbd>I</kbd> Inventory · <kbd>J</kbd> Quests · <kbd>K</kbd> Skills · <kbd>Space</kbd> Dodge
+  </div>
+
+  <div class="mini"><canvas id="mapCanvas" width="150" height="150"></canvas></div>
+  <div id="toast" class="toast"></div>
+
+  <div id="startScreen" class="start-screen">
+    <div class="start-card">
+      <div class="number">A STORY-DRIVEN FANTASY RPG</div>
+      <h1>The Persecution</h1>
+      <div class="byline">By Harassechon Fudjiwik</div>
+      <div class="story">
+        In the palace of Vidotsche, King Herodjner's arrogance and greed turn against the warriors of Hesitoch. The enchanted god Persecuria confronts the king and reveals the cost of persecuting the very people whose trust sustains his rule. Explore the palace grounds, help its people, and decide whether the king can change.
+      </div>
+      <p class="moral"><b>Moral:</b> Do not persecute the people who serve your organization. Oppression destroys trust and may be unjust and unlawful.</p>
+      <button class="btn primary" id="startBtn">Start Game</button>
+    </div>
+  </div>
+
+  <div id="panel" class="panel hidden"></div>
+  <div id="dialogue" class="dialogue hidden"></div>
+  <div id="combat" class="combat-box hidden"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("world");
+  const ctx = canvas.getContext("2d");
+  const mapCanvas = document.getElementById("mapCanvas");
+  const mctx = mapCanvas.getContext("2d");
+
+  const world = { w: 1800, h: 1200 };
+  const player = {
+    x: 900, y: 870, r: 14, speed: 190,
+    hp: 100, maxHp: 100, level: 1, xp: 0, nextXp: 100,
+    attack: 14, defense: 2, gold: 20, potions: 2,
+    weapon: "Hesitoch Sword", armor: "Traveler's Cloak",
+    skills: { resolve: 0, diplomacy: 0, vigor: 0 },
+    facing: 0
+  };
+
+  const npcs = [
+    { id:"persecuria", name:"Persecuria", x:900, y:715, color:"#9b7bdb", role:"Enchanted God",
+      lines:[
+        "Warrior of Hesitoch, I have watched this injustice grow. King Herodjner's fear has become persecution.",
+        "Help me gather testimony from the palace grounds. The king must understand that a ruler without the trust of the people has no true strength.",
+        "Bring me the testimony, then face the king with the truth. We can seek justice without becoming cruel ourselves."
+      ]},
+    { id:"guard", name:"Hesitoch Guard", x:690, y:865, color:"#6e9cc6", role:"Palace Guard",
+      lines:["The king's orders grow harsher each day. I still serve Vidotsche, but I will not harm innocent people.",
+        "A supply chest near the eastern courtyard may help you. Please be careful; a royal enforcer patrols there."]},
+    { id:"healer", name:"Mira the Healer", x:1110, y:865, color:"#76c995", role:"Healer",
+      lines:["The frightened people need medicine and someone willing to listen.",
+        "I can prepare a healing potion for 12 gold. You can also find supplies by helping the palace folk."]},
+    { id:"citizen", name:"Palace Citizen", x:760, y:610, color:"#d5a879", role:"Witness",
+      lines:["I saw the king's soldiers take food from families who had done nothing wrong.",
+        "If someone asks, tell them we want fairness—not revenge."]},
+    { id:"scribe", name:"Royal Scribe", x:1050, y:585, color:"#d9c56f", role:"Witness",
+      lines:["I have records proving the accusations against Hesitoch were fabricated.",
+        "Take this testimony to Persecuria. Let the truth be heard in the throne room."]}
+  ];
+
+  const enemies = [
+    { id:"enforcer", name:"Royal Enforcer", x:1330, y:770, hp:48, maxHp:48, attack:9, xp:45, gold:12, alive:true, boss:false },
+    { id:"captain", name:"Captain of the Crown", x:1390, y:510, hp:82, maxHp:82, attack:14, xp:100, gold:30, alive:true, boss:true }
+  ];
+
+  const quests = [
+    { id:"truth", name:"The King's Reckoning", type:"Main Quest", desc:"Speak with Persecuria, gather testimony, defeat the Royal Enforcer, then confront King Herodjner.", status:"active" },
+    { id:"witness", name:"Voices of Hesitoch", type:"Side Quest", desc:"Speak with the Palace Citizen and Royal Scribe, then report their testimony to Persecuria.", status:"active" },
+    { id:"supplies", name:"A Guard's Request", type:"Side Quest", desc:"Find the supply chest in the eastern courtyard and return to the Hesitoch Guard.", status:"active" }
+  ];
+
+  const items = [
+    { id:"potion", name:"Healing Potion", desc:"Restores 35 health.", qty:2, kind:"consumable" },
+    { id:"testimony", name:"Witness Testimony", desc:"The citizens' account of the persecution.", qty:0, kind:"quest" },
+    { id:"supply", name:"Hesitoch Supplies", desc:"Supplies recovered from the courtyard.", qty:0, kind:"quest" }
+  ];
+
+  let started = false, dialogueIndex = 0, activeNpc = null, combatEnemy = null;
+  let panelOpen = false, keys = {}, lastTime = 0, toastTimer = 0;
+  let camera = { x:0, y:0 };
+  let chest = { x:1280, y:950, opened:false };
+  let throne = { x:900, y:285 };
+  let defeatedKing = false;
+  let dodgeTimer = 0;
+  let particles = [];
+  let worldWidth = 0, worldHeight = 0;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    worldWidth = canvas.clientWidth;
+    worldHeight = canvas.clientHeight;
+    canvas.width = Math.floor(worldWidth * dpr);
+    canvas.height = Math.floor(worldHeight * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function toast(text) {
+    const el = document.getElementById("toast");
+    el.textContent = text;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+  function item(id) { return items.find(i => i.id === id); }
+  function quest(id) { return quests.find(q => q.id === id); }
+  function setObjective(text) { document.getElementById("objectiveText").textContent = text; }
+
+  function updateHud() {
+    document.getElementById("healthFill").style.width = `${Math.max(0,player.hp/player.maxHp*100)}%`;
+    document.getElementById("healthText").textContent = `${player.hp} / ${player.maxHp}`;
+    document.getElementById("xpFill").style.width = `${Math.min(100,player.xp/player.nextXp*100)}%`;
+    document.getElementById("xpText").textContent = `${player.xp} / ${player.nextXp} XP`;
+    document.getElementById("levelText").textContent = `Level ${player.level}`;
+  }
+
+  function addXp(amount) {
+    player.xp += amount;
+    toast(`+${amount} XP`);
+    while (player.xp >= player.nextXp) {
+      player.xp -= player.nextXp;
+      player.level++;
+      player.nextXp = Math.floor(player.nextXp * 1.35);
+      player.maxHp += 12;
+      player.hp = player.maxHp;
+      player.attack += 2;
+      toast(`Level up! You are now level ${player.level}.`);
+    }
+    updateHud();
+  }
+
+  function openPanel(title, body) {
+    const panel = document.getElementById("panel");
+    panel.innerHTML = `<button class="btn close" onclick="closePanel()">Close</button><h2>${title}</h2>${body}`;
+    panel.classList.remove("hidden");
+    panelOpen = true;
+  }
+  window.closePanel = () => {
+    document.getElementById("panel").classList.add("hidden");
+    panelOpen = false;
+  };
+
+  function showDialogue(npc, text, choices = []) {
+    const box = document.getElementById("dialogue");
+    box.innerHTML = `<b>${npc.name}</b> <span style="color:#aeb4c2">— ${npc.role}</span>
+      <p>${text}</p><div class="dialogue-actions">
+      ${choices.map(c => `<button class="btn" onclick="${c.action}">${c.label}</button>`).join("")}
+      <button class="btn primary" onclick="nextDialogue()">Continue</button></div>`;
+    box.classList.remove("hidden");
+    activeNpc = npc;
+  }
+  window.nextDialogue = () => {
+    if (!activeNpc) return;
+    const npc = activeNpc;
+    dialogueIndex++;
+    if (npc.id === "persecuria" && dialogueIndex === 1) {
+      setObjective("Gather testimony from the citizen and scribe");
+    }
+    if (npc.id === "citizen" || npc.id === "scribe") {
+      if (item("testimony").qty === 0) {
+        item("testimony").qty = 1;
+        toast("Witness testimony recorded.");
+      }
+    }
+    if (npc.id === "guard" && dialogueIndex >= 1) {
+      // Guard gives a clue; supplies are collected from the chest.
+    }
+    if (dialogueIndex >= npc.lines.length) {
+      document.getElementById("dialogue").classList.add("hidden");
+      if (npc.id === "persecuria" && item("testimony").qty > 0) {
+        quest("witness").status = "complete";
+        toast("Side quest complete: Voices of Hesitoch");
+        addXp(35);
+      }
+      if (npc.id === "guard" && item("supply").qty > 0) {
+        quest("supplies").status = "complete";
+        toast("Side quest complete: A Guard's Request");
+        addXp(30);
+      }
+      activeNpc = null;
+      dialogueIndex = 0;
+      return;
+    }
+    showDialogue(npc, npc.lines[dialogueIndex]);
+  };
+
+  function nearbyTarget() {
+    let candidates = [];
+    for (const npc of npcs) {
+      const d = Math.hypot(player.x-npc.x, player.y-npc.y);
+      if (d < 62) candidates.push({ type:"npc", obj:npc, d });
+    }
+    for (const enemy of enemies) {
+      if (!enemy.alive) continue;
+      const d = Math.hypot(player.x-enemy.x, player.y-enemy.y);
+      if (d < 68) candidates.push({ type:"enemy", obj:enemy, d });
+    }
+    if (!chest.opened) {
+      const d = Math.hypot(player.x-chest.x, player.y-chest.y);
+      if (d < 62) candidates.push({ type:"chest", obj:chest, d });
+    }
+    if (!defeatedKing) {
+      const d = Math.hypot(player.x-throne.x, player.y-throne.y);
+      if (d < 90) candidates.push({ type:"king", obj:null, d });
+    }
+    candidates.sort((a,b)=>a.d-b.d);
+    return candidates[0];
+  }
+
+  function interact() {
+    if (!started || panelOpen || !document.getElementById("dialogue").classList.contains("hidden")) return;
+    const target = nearbyTarget();
+    if (!target) { toast("Nothing nearby to interact with."); return; }
+    if (target.type === "npc") {
+      dialogueIndex = 0;
+      const npc = target.obj;
+      if (npc.id === "healer") {
+        showDialogue(npc, `${npc.lines[0]} ${npc.lines[1]}`, [
+          {label:"Buy potion — 12 gold", action:"buyPotion()"}
+        ]);
+      } else if (npc.id === "persecuria" && item("testimony").qty > 0) {
+        showDialogue(npc, "You have brought the people's testimony. Their words are clear: they seek fairness, not revenge. Now we must face the king.", []);
+        dialogueIndex = npc.lines.length - 1;
+      } else {
+        showDialogue(npc, npc.lines[0]);
+      }
+    } else if (target.type === "enemy") {
+      startCombat(target.obj);
+    } else if (target.type === "chest") {
+      chest.opened = true;
+      item("supply").qty = 1;
+      toast("Found Hesitoch Supplies! Return to the guard.");
+      setObjective("Return the supplies to the Hesitoch Guard");
+    } else if (target.type === "king") {
+      if (enemies.some(e=>e.alive)) {
+        showDialogue({name:"King Herodjner",role:"King of Vidotsche"},
+          "The royal captain still stands between us. Prove your resolve before you challenge the crown.");
+        return;
+      }
+      if (item("testimony").qty === 0) {
+        showDialogue({name:"King Herodjner",role:"King of Vidotsche"},
+          "You come without the people's testimony. Hear them first, then return.");
+        return;
+      }
+      startKingConfrontation();
+    }
+  }
+
+  window.buyPotion = () => {
+    if (player.gold < 12) { toast("Not enough gold."); return; }
+    player.gold -= 12;
+    player.potions++;
+    item("potion").qty++;
+    toast("Healing Potion purchased.");
+    document.getElementById("dialogue").classList.add("hidden");
+  };
+
+  function startCombat(enemy) {
+    combatEnemy = enemy;
+    renderCombat("Your turn");
+  }
+  function renderCombat(status) {
+    if (!combatEnemy) return;
+    const box = document.getElementById("combat");
+    box.innerHTML = `<h2>${combatEnemy.boss ? "BOSS: " : ""}${combatEnemy.name}</h2>
+      <p>${status} · Your health: ${player.hp}/${player.maxHp}</p>
+      <div class="enemy-bar"><div id="enemyFill" style="width:${combatEnemy.hp/combatEnemy.maxHp*100}%"></div></div>
+      <p style="font-size:12px;color:#aeb4c2">Enemy health: ${combatEnemy.hp}/${combatEnemy.maxHp}</p>
+      <div class="combat-actions">
+        <button class="btn primary" onclick="combatAction('attack')">Attack</button>
+        <button class="btn" onclick="combatAction('heavy')">Heavy Strike</button>
+        <button class="btn" onclick="combatAction('potion')">Use Potion (${player.potions})</button>
+        <button class="btn" onclick="combatAction('dodge')">Dodge</button>
+      </div>`;
+    box.classList.remove("hidden");
+  }
+  function enemyTurn(status) {
+    if (!combatEnemy) return;
+    const damage = Math.max(1, combatEnemy.attack - player.defense - player.skills.vigor * 2);
+    player.hp = Math.max(0, player.hp - damage);
+    updateHud();
+    if (player.hp <= 0) {
+      player.hp = Math.ceil(player.maxHp * .6);
+      player.x = 900; player.y = 870;
+      combatEnemy = null;
+      document.getElementById("combat").classList.add("hidden");
+      toast("You were defeated and recovered near the courtyard.");
+      updateHud();
+      return;
+    }
+    renderCombat(`${status} The enemy dealt ${damage} damage.`);
+  }
+  window.combatAction = action => {
+    if (!combatEnemy) return;
+    if (action === "potion") {
+      if (player.potions <= 0) { renderCombat("No potions remaining."); return; }
+      player.potions--;
+      item("potion").qty = Math.max(0,item("potion").qty-1);
+      player.hp = Math.min(player.maxHp, player.hp + 35);
+      updateHud();
+      enemyTurn("You used a potion.");
+      return;
+    }
+    if (action === "dodge") {
+      if (Math.random() < .72) {
+        renderCombat("You dodged the attack successfully. Your turn.");
+      } else {
+        enemyTurn("Your dodge failed.");
+      }
+      return;
+    }
+    let damage = player.attack + player.skills.resolve * 3 + Math.floor(Math.random()*7);
+    if (action === "heavy") damage = Math.floor(damage * 1.65);
+    combatEnemy.hp = Math.max(0,combatEnemy.hp-damage);
+    if (combatEnemy.hp <= 0) {
+      const defeated = combatEnemy;
+      defeated.alive = false;
+      player.gold += defeated.gold;
+      combatEnemy = null;
+      document.getElementById("combat").classList.add("hidden");
+      toast(`${defeated.name} defeated! +${defeated.gold} gold`);
+      addXp(defeated.xp);
+      if (defeated.id === "enforcer") {
+        setObjective("Gather testimony, then confront King Herodjner");
+      }
+      if (defeated.boss) {
+        quest("truth").status = "complete";
+        defeatedKing = true;
+        setObjective("The people of Vidotsche are free to rebuild");
+        showEnding();
+      }
+      return;
+    }
+    enemyTurn(`You dealt ${damage} damage.`);
+  };
+
+  function startKingConfrontation() {
+    const king = {id:"king",name:"King Herodjner",x:throne.x,y:throne.y,hp:105,maxHp:105,attack:15,xp:150,gold:0,alive:true,boss:true};
+    enemies.push(king);
+    startCombat(king);
+  }
+
+  function showEnding() {
+    openPanel("The Persecution — Ending", `
+      <p>King Herodjner has been defeated. Faced with the truth and the courage of Hesitoch, he finally understands that fear cannot earn loyalty.</p>
+      <p>Persecuria helps establish a fair council for Vidotsche. The people begin to rebuild—not through revenge, but through justice, accountability, and restored trust.</p>
+      <p class="moral"><b>Moral lesson:</b> Power without fairness creates fear and mistrust. Listen to people, protect their dignity, and take responsibility for injustice.</p>
+      <p><b>Level:</b> ${player.level} &nbsp; <b>Gold:</b> ${player.gold}</p>
+      <button class="btn primary" onclick="closePanel()">Continue exploring</button>`);
+  }
+
+  function showInventory() {
+    const rows = items.map(i => `<div class="row"><div><b>${i.name}</b><small>${i.desc}</small></div><span>x${i.qty}</span>
+      ${i.id==="potion" ? `<button class="btn" onclick="useInventoryPotion()">Use</button>` : ""}</div>`).join("");
+    openPanel("Inventory & Equipment", `
+      <p class="sub">Gold: <b>${player.gold}</b> · Potions: <b>${player.potions}</b></p>
+      <h3>Items</h3>${rows}
+      <h3>Equipment</h3>
+      <div class="row"><div><b>Weapon</b><small>${player.weapon} · Attack +${player.attack}</small></div><button class="btn" onclick="equipSword()">Equip</button></div>
+      <div class="row"><div><b>Armor</b><small>${player.armor} · Defense +${player.defense}</small></div><button class="btn" onclick="equipArmor()">Equip</button></div>`);
+  }
+  window.useInventoryPotion = () => {
+    if (player.potions <= 0) { toast("No potions remaining."); return; }
+    if (player.hp >= player.maxHp) { toast("Health is already full."); return; }
+    player.potions--; item("potion").qty--;
+    player.hp = Math.min(player.maxHp,player.hp+35);
+    updateHud(); showInventory(); toast("Recovered health.");
+  };
+  window.equipSword = () => { player.weapon="Royal-forged Hesitoch Blade"; player.attack += 3; showInventory(); toast("Weapon equipped: Attack increased."); };
+  window.equipArmor = () => { player.armor="Reinforced Guard Armor"; player.defense += 2; showInventory(); toast("Armor equipped: Defense increased."); };
+
+  function showQuests() {
+    const rows = quests.map(q => `<div class="row"><div><b>${q.name}</b><small>${q.type} · ${q.desc}</small></div>
+      <span class="${q.status==="complete"?"quest-done":""}">${q.status==="complete"?"Complete":"Active"}</span></div>`).join("");
+    openPanel("Quest Journal", rows);
+  }
+
+  function showSkills() {
+    const skillData = [
+      {id:"resolve",name:"Resolve",desc:"Increase attack damage by 3 per rank."},
+      {id:"diplomacy",name:"Diplomacy",desc:"A reminder to seek peaceful solutions; unlocks better dialogue."},
+      {id:"vigor",name:"Vigor",desc:"Reduce incoming damage by 2 per rank."}
+    ];
+    const rows = skillData.map(s=>`<div class="row"><div><b>${s.name}</b><small>${s.desc}<br>Rank ${player.skills[s.id]}</small></div>
+      <button class="btn" onclick="buySkill('${s.id}')">Learn · 1 point</button></div>`).join("");
+    openPanel("Progression & Skill Tree", `
+      <p class="sub">Skill points available: <b id="skillPoints">${Math.max(0,player.level-1-Object.values(player.skills).reduce((a,b)=>a+b,0))}</b></p>
+      ${rows}<p class="skill-note">Gain one skill point each time you level up.</p>`);
+  }
+  window.buySkill = id => {
+    const spent = Object.values(player.skills).reduce((a,b)=>a+b,0);
+    if (spent >= player.level-1) { toast("No skill points available."); return; }
+    player.skills[id]++;
+    if (id==="vigor") player.defense += 2;
+    toast(`${id[0].toUpperCase()+id.slice(1)} skill improved.`);
+    showSkills();
+  };
+
+  window.addEventListener("keydown", e => {
+    const key = e.key.toLowerCase();
+    if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(key)) e.preventDefault();
+    if (key === "i") { if (panelOpen) closePanel(); else showInventory(); }
+    if (key === "j") { if (panelOpen) closePanel(); else showQuests(); }
+    if (key === "k") { if (panelOpen) closePanel(); else showSkills(); }
+    if (key === "e") interact();
+    if (key === "escape") {
+      if (panelOpen) closePanel();
+      document.getElementById("dialogue").classList.add("hidden");
+    }
+    if (key === " " && started && !panelOpen) dodgeTimer = .35;
+    keys[key] = true;
+  });
+  window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+  document.getElementById("startBtn").addEventListener("click", () => {
+    document.getElementById("startScreen").classList.add("hidden");
+    started = true;
+    toast("Find Persecuria in the palace courtyard.");
+  });
+
+  function roundedRect(c,x,y,w,h,r,fill,stroke) {
+    c.beginPath(); c.roundRect(x,y,w,h,r);
+    if (fill) { c.fillStyle=fill; c.fill(); }
+    if (stroke) { c.strokeStyle=stroke; c.stroke(); }
+  }
+  function drawTree(x,y) {
+    ctx.fillStyle="#453a2b"; ctx.fillRect(x-5,y-4,10,27);
+    ctx.fillStyle="#283b31";
+    ctx.beginPath(); ctx.arc(x,y-13,20,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="#334a38";
+    ctx.beginPath(); ctx.arc(x-9,y-22,12,0,Math.PI*2); ctx.fill();
+  }
+  function drawBuilding(x,y,w,h,label,color="#79634a") {
+    ctx.fillStyle="#0005"; ctx.fillRect(x+8,y+9,w,h);
+    ctx.fillStyle=color; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle="#b89a67"; ctx.fillRect(x-8,y-12,w+16,18);
+    ctx.fillStyle="#4f3e31";
+    ctx.beginPath(); ctx.moveTo(x-12,y-12); ctx.lineTo(x+w/2,y-48); ctx.lineTo(x+w+12,y-12); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#201b1a"; ctx.fillRect(x+w/2-14,y+h-43,28,43);
+    ctx.fillStyle="#d4b36d"; ctx.font="bold 13px Georgia"; ctx.textAlign="center";
+    ctx.fillText(label,x+w/2,y+h+19);
+  }
+  function drawCharacter(x,y,color,label,isPlayer=false) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.fillStyle="#0006"; ctx.beginPath(); ctx.ellipse(0,9,13,6,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=color; ctx.beginPath(); ctx.arc(0,-5,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=isPlayer?"#e9d4a0":"#e8c39b"; ctx.beginPath(); ctx.arc(0,-20,7,0,Math.PI*2); ctx.fill();
+    if (isPlayer) {
+      ctx.strokeStyle="#e4cf91"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(9,-7); ctx.lineTo(16,-24); ctx.stroke();
+    }
+    ctx.fillStyle="#f7eddb"; ctx.font="12px Arial"; ctx.textAlign="center";
+    ctx.fillText(label,0,-35);
+    ctx.restore();
+  }
+  function drawWorld() {
+    ctx.clearRect(0,0,worldWidth,worldHeight);
+    const grad = ctx.createLinearGradient(0,0,0,worldHeight);
+    grad.addColorStop(0,"#39433e"); grad.addColorStop(.53,"#53604b"); grad.addColorStop(1,"#343a32");
+    ctx.fillStyle=grad; ctx.fillRect(0,0,worldWidth,worldHeight);
+    camera.x = Math.max(0,Math.min(world.w-worldWidth,player.x-worldWidth/2));
+    camera.y = Math.max(0,Math.min(world.h-worldHeight,player.y-worldHeight/2));
+    ctx.save(); ctx.translate(-camera.x,-camera.y);
+
+    // Ground paths and courtyard
+    ctx.fillStyle="#84785d"; ctx.fillRect(690,0,420,world.h);
+    ctx.fillStyle="#71664f"; ctx.fillRect(0,700,world.w,250);
+    ctx.fillStyle="#8c8063"; ctx.fillRect(790,0,220,world.h);
+    ctx.fillStyle="#6f654f"; ctx.fillRect(610,420,580,350);
+    ctx.strokeStyle="#aa9a72"; ctx.lineWidth=4;
+    ctx.strokeRect(610,420,580,350);
+
+    // Palace and throne hall
+    drawBuilding(720,105,360,210,"VIDOTSCHE PALACE","#75634e");
+    drawBuilding(810,230,180,130,"THRONE HALL","#80694e");
+    drawBuilding(130,420,250,160,"ARMORY","#665847");
+    drawBuilding(1400,300,230,170,"BARRACKS","#625b4a");
+    drawBuilding(210,920,250,140,"STABLES","#715c43");
+
+    // Trees, rocks, lanterns
+    for (let i=0;i<18;i++) {
+      const x=70+i*97, y=(i%2===0?80:1080);
+      drawTree(x,y);
+    }
+    for (let i=0;i<12;i++) drawTree(80+(i%3)*38,300+i*62);
+    for (let i=0;i<11;i++) drawTree(1660+(i%2)*42,520+i*55);
+    for (let i=0;i<6;i++) {
+      ctx.fillStyle="#d7ad5e"; ctx.beginPath(); ctx.arc(650+i*100,440,4,0,Math.PI*2); ctx.fill();
+    }
+
+    // Throne
+    ctx.fillStyle="#4a2e2c"; ctx.fillRect(throne.x-31,throne.y-10,62,42);
+    ctx.fillStyle="#c19a50"; ctx.fillRect(throne.x-25,throne.y-35,50,27);
+    ctx.fillStyle="#f2d78b"; ctx.font="12px Georgia"; ctx.textAlign="center"; ctx.fillText("KING HERODJNER",throne.x,throne.y-47);
+
+    // Chest
+    if (!chest.opened) {
+      ctx.fillStyle="#68452a"; ctx.fillRect(chest.x-16,chest.y-12,32,23);
+      ctx.fillStyle="#c49a48"; ctx.fillRect(chest.x-17,chest.y-15,34,7);
+      ctx.fillStyle="#f1d17b"; ctx.fillRect(chest.x-2,chest.y-7,4,8);
+      ctx.fillStyle="#fff2c8"; ctx.font="11px Arial"; ctx.textAlign="center"; ctx.fillText("SUPPLY CHEST",chest.x,chest.y-24);
+    }
+
+    npcs.forEach(n=>drawCharacter(n.x,n.y,n.color,n.name));
+    enemies.forEach(e=>{ if(e.alive) drawCharacter(e.x,e.y,e.boss?"#a93f42":"#8b3c42",e.name); });
+    drawCharacter(player.x,player.y,"#5e83aa","You",true);
+
+    // Nearby interaction hint
+    const target=nearbyTarget();
+    if (target && !panelOpen && document.getElementById("dialogue").classList.contains("hidden")) {
+      ctx.fillStyle="#fff2c8"; ctx.font="bold 13px Arial"; ctx.textAlign="center";
+      ctx.fillText("E  INTERACT",player.x,player.y-54);
+    }
+    ctx.restore();
+    drawMiniMap();
+  }
+
+  function drawMiniMap() {
+    const w=mapCanvas.width,h=mapCanvas.height;
+    mctx.clearRect(0,0,w,h);
+    mctx.fillStyle="#26352e"; mctx.fillRect(0,0,w,h);
+    mctx.fillStyle="#81765c"; mctx.fillRect(54,0,42,h); mctx.fillRect(0,79,w,31);
+    mctx.fillStyle="#625442"; mctx.fillRect(61,18,28,25);
+    mctx.fillStyle="#a28a5c"; mctx.fillRect(55,51,40,42);
+    const sx=w/world.w, sy=h/world.h;
+    npcs.forEach(n=>{mctx.fillStyle=n.id==="persecuria"?"#bd91ff":"#8ed5ab";mctx.beginPath();mctx.arc(n.x*sx,n.y*sy,3,0,Math.PI*2);mctx.fill();});
+    enemies.forEach(e=>{if(e.alive){mctx.fillStyle="#f25e65";mctx.beginPath();mctx.arc(e.x*sx,e.y*sy,3,0,Math.PI*2);mctx.fill();}});
+    mctx.fillStyle="#f5d271";mctx.beginPath();mctx.arc(player.x*sx,player.y*sy,4,0,Math.PI*2);mctx.fill();
+  }
+
+  function update(dt) {
+    if (!started || panelOpen || combatEnemy || !document.getElementById("dialogue").classList.contains("hidden")) return;
+    let dx=0,dy=0;
+    if (keys.w||keys.arrowup) dy--;
+    if (keys.s||keys.arrowdown) dy++;
+    if (keys.a||keys.arrowleft) dx--;
+    if (keys.d||keys.arrowright) dx++;
+    if (dx||dy) {
+      const len=Math.hypot(dx,dy); dx/=len; dy/=len;
+      const speed=player.speed*(dodgeTimer>0?2.25:1);
+      player.x=Math.max(30,Math.min(world.w-30,player.x+dx*speed*dt));
+      player.y=Math.max(30,Math.min(world.h-30,player.y+dy*speed*dt));
+      player.facing=Math.atan2(dy,dx);
+    }
+    dodgeTimer=Math.max(0,dodgeTimer-dt);
+  }
+  function loop(time) {
+    const dt=Math.min(.04,(time-lastTime)/1000||0); lastTime=time;
+    update(dt); drawWorld(); requestAnimationFrame(loop);
+  }
+  updateHud();
+  requestAnimationFrame(loop);
+
+  // Quest progress and contextual objective updates.
+  setInterval(() => {
+    if (item("testimony").qty > 0 && quest("witness").status === "active") {
+      setObjective("Report the testimony to Persecuria");
+    }
+    if (item("supply").qty > 0 && quest("supplies").status === "active") {
+      setObjective("Return the supplies to the Hesitoch Guard");
+    }
+  }, 700);
+})();
+</script>
+</body>
+</html>
